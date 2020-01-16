@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  hts
+
+  Hollywood Theatre Scraper
+
+Globals:
+  Function:
+    Timeout: 5
+
+Resources:
+  HtsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: hts
+      Runtime: go1.x
+      Tracing: Active
+      Events:
+        Schedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(15 minutes)
