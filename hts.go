@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -10,7 +11,11 @@ import (
 	"google.golang.org/appengine/log"
 )
 
-const hollywoodTheatreURL = "https://hollywoodtheatre.org/m/calendar/"
+const (
+	hollywoodTheatreURL = "https://hollywoodtheatre.org/m/calendar/"
+	dateTimeFormat      = "2006-01-023:04 PM"
+	timezone            = "America/Los_Angeles"
+)
 
 type scrapedShowtime struct {
 	Series string
@@ -25,16 +30,15 @@ type showtime struct {
 	StartDateTime time.Time
 }
 
-func handler(ctx context.Context) error {
-	scrapedShowtimes := scrapeShowtimes(hollywoodTheatreURL)
-
+func handler(ctx context.Context) {
+	scrapedShowtimes := scrapeShowtimes()
 	for _, s := range scrapedShowtimes {
 		if s.Title == "" {
 			log.Errorf(ctx, "no title found for scraped entry %v", s)
 			continue
 		}
 		if s.Date == "" || s.Time == "" {
-			log.Errorf(ctx, "no date and/or time for %v", s)
+			log.Errorf(ctx, "no date and/or time for scraped entry %v", s)
 			continue
 		}
 		parsedDateTime, err := parseDateTime(s.Date, s.Time)
@@ -43,16 +47,15 @@ func handler(ctx context.Context) error {
 			continue
 		}
 		showtime := showtime{
-			Series:        s.Series,
+			Series:        strings.ReplaceAll(s.Series, ":", ""),
 			Title:         s.Title,
 			StartDateTime: parsedDateTime,
 		}
 		fmt.Printf("Showtime: %v\n", showtime)
 	}
-	return nil
 }
 
-func scrapeShowtimes(url string) []scrapedShowtime {
+func scrapeShowtimes() []scrapedShowtime {
 	var scrapedShowtimes []scrapedShowtime
 	c := colly.NewCollector()
 
@@ -80,10 +83,15 @@ func scrapeShowtimes(url string) []scrapedShowtime {
 
 func parseDateTime(date, t string) (time.Time, error) {
 	dateTime := date + t
-	format := "2006-01-023:04 PM"
-	location, err := time.LoadLocation("America/Los_Angeles")
-	parsedDateTime, err := time.ParseInLocation(format, dateTime, location)
-	return parsedDateTime, err
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return time.Time{}, err
+	}
+	parsedDateTime, err := time.ParseInLocation(dateTimeFormat, dateTime, location)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return parsedDateTime, nil
 }
 
 func main() {
