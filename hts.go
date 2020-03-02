@@ -3,15 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/gocolly/colly"
-	"google.golang.org/appengine/log"
 )
 
 const (
+	localDynamoDbURL    = "http://docker.for.mac.localhost:8000/"
+	dynamoDbTableName   = "Showtimes"
 	hollywoodTheatreURL = "https://hollywoodtheatre.org/m/calendar/"
 	dateTimeFormat      = "2006-01-023:04 PM"
 	timezone            = "America/Los_Angeles"
@@ -25,34 +31,61 @@ type scrapedShowtime struct {
 }
 
 type showtime struct {
-	Series        string
-	Title         string
-	StartDateTime time.Time
+	Series   string
+	Title    string
+	DateTime time.Time
 }
 
-func handler(ctx context.Context) {
+func handler(ctx context.Context) error {
+	sess := session.Must(session.NewSessionWithOptions(session.Options{SharedConfigState: session.SharedConfigEnable}))
+	var svc *dynamodb.DynamoDB
+	if name := os.Getenv("ENVIRONMENT"); name == "local" {
+		svc = dynamodb.New(
+			sess,
+			&aws.Config{
+				Endpoint: aws.String(localDynamoDbURL),
+			})
+	} else {
+		svc = dynamodb.New(sess)
+	}
+
 	scrapedShowtimes := scrapeShowtimes()
 	for _, s := range scrapedShowtimes {
 		if s.Title == "" {
-			log.Errorf(ctx, "no title found for scraped entry %v", s)
+			fmt.Fprintf(os.Stderr, "no title found for scraped entry %v", s)
 			continue
 		}
 		if s.Date == "" || s.Time == "" {
-			log.Errorf(ctx, "no date and/or time for scraped entry %v", s)
+			fmt.Fprintf(os.Stderr, "no date and/or time for scraped entry %v", s)
 			continue
 		}
 		parsedDateTime, err := parseDateTime(s.Date, s.Time)
 		if err != nil {
-			log.Errorf(ctx, "unable to parse datetime for %v on %v at %v: %v", s.Title, s.Date, s.Time, err)
+			fmt.Fprintf(os.Stderr, "unable to parse datetime for %v on %v at %v: %v", s.Title, s.Date, s.Time, err)
 			continue
 		}
 		showtime := showtime{
-			Series:        strings.ReplaceAll(s.Series, ":", ""),
-			Title:         s.Title,
-			StartDateTime: parsedDateTime,
+			Series:   strings.ReplaceAll(s.Series, ":", ""),
+			Title:    s.Title,
+			DateTime: parsedDateTime,
 		}
 		fmt.Printf("Showtime: %v\n", showtime)
+		av, err := dynamodbattribute.MarshalMap(showtime)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error marshalling new showtime item %v: %v", av, err)
+			continue
+		}
+		input := &dynamodb.PutItemInput{
+			Item:      av,
+			TableName: aws.String(dynamoDbTableName),
+		}
+		_, err = svc.PutItem(input)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error calling PutItem %v: %v", input, err)
+			continue
+		}
 	}
+	return nil
 }
 
 func scrapeShowtimes() []scrapedShowtime {

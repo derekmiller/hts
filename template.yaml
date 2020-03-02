@@ -10,7 +10,7 @@ Globals:
     Timeout: 5
 
 Resources:
-  HtsFunction:
+  Hts:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
@@ -22,3 +22,6 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: rate(15 minutes)
+      Environment:
+        Variables:
+          ENVIRONMENT: production

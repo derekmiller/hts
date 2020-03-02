@@ -1,0 +1,15 @@
+{
+    "TableName": "Showtimes",
+    "KeySchema": [
+      { "AttributeName": "Title", "KeyType": "HASH" },
+      { "AttributeName": "DateTime", "KeyType": "RANGE" }
+    ],
+    "AttributeDefinitions": [
+      { "AttributeName": "Title", "AttributeType": "S" },
+      { "AttributeName": "DateTime", "AttributeType": "S" }
+    ],
+    "ProvisionedThroughput": {
+      "ReadCapacityUnits": 1,
+      "WriteCapacityUnits": 1
+    }
+}
