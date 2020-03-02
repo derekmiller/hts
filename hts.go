@@ -17,7 +17,7 @@ import (
 
 const (
 	localDynamoDbURL    = "http://docker.for.mac.localhost:8000/"
-	dynamoDbTableName   = "Showtimes"
+	dynamoDbTableName   = "HollywoodTheatreShowtimes"
 	hollywoodTheatreURL = "https://hollywoodtheatre.org/m/calendar/"
 	dateTimeFormat      = "2006-01-023:04 PM"
 	timezone            = "America/Los_Angeles"
@@ -39,7 +39,7 @@ type showtime struct {
 func handler(ctx context.Context) error {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{SharedConfigState: session.SharedConfigEnable}))
 	var svc *dynamodb.DynamoDB
-	if name := os.Getenv("ENVIRONMENT"); name == "development" {
+	if os.Getenv("ENVIRONMENT") == "development" {
 		svc = dynamodb.New(
 			sess,
 			&aws.Config{
