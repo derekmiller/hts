@@ -39,7 +39,7 @@ type showtime struct {
 func handler(ctx context.Context) error {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{SharedConfigState: session.SharedConfigEnable}))
 	var svc *dynamodb.DynamoDB
-	if name := os.Getenv("ENVIRONMENT"); name == "local" {
+	if name := os.Getenv("ENVIRONMENT"); name == "development" {
 		svc = dynamodb.New(
 			sess,
 			&aws.Config{

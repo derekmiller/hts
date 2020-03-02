@@ -1,5 +1,5 @@
 {
     "Hts": {
-        "ENVIRONMENT": "local"
+        "ENVIRONMENT": "development"
     }
 }
