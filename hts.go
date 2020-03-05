@@ -37,18 +37,7 @@ type showtime struct {
 }
 
 func handler(ctx context.Context) error {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{SharedConfigState: session.SharedConfigEnable}))
-	var svc *dynamodb.DynamoDB
-	if os.Getenv("ENVIRONMENT") == "development" {
-		svc = dynamodb.New(
-			sess,
-			&aws.Config{
-				Endpoint: aws.String(localDynamoDbURL),
-			})
-	} else {
-		svc = dynamodb.New(sess)
-	}
-
+	svc := getDynamoDBService()
 	scrapedShowtimes := scrapeShowtimes()
 	for _, s := range scrapedShowtimes {
 		if s.Title == "" {
@@ -86,6 +75,18 @@ func handler(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func getDynamoDBService() *dynamodb.DynamoDB {
+	sess := session.Must(session.NewSessionWithOptions(session.Options{SharedConfigState: session.SharedConfigEnable}))
+	if os.Getenv("ENVIRONMENT") == "development" {
+		return dynamodb.New(
+			sess,
+			&aws.Config{
+				Endpoint: aws.String(localDynamoDbURL),
+			})
+	}
+	return dynamodb.New(sess)
 }
 
 func scrapeShowtimes() []scrapedShowtime {
