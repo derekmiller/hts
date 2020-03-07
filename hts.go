@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
@@ -39,41 +40,48 @@ type showtime struct {
 func handler(ctx context.Context) error {
 	svc := getDynamoDBService()
 	scrapedShowtimes := scrapeShowtimes()
+	var wg sync.WaitGroup
+	wg.Add(len(scrapedShowtimes))
 	for _, s := range scrapedShowtimes {
-		if s.Title == "" {
-			fmt.Fprintf(os.Stderr, "no title found for scraped entry %v", s)
-			continue
-		}
-		if s.Date == "" || s.Time == "" {
-			fmt.Fprintf(os.Stderr, "no date and/or time for scraped entry %v", s)
-			continue
-		}
-		parsedDateTime, err := parseDateTime(s.Date, s.Time)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to parse datetime for %v on %v at %v: %v", s.Title, s.Date, s.Time, err)
-			continue
-		}
-		showtime := showtime{
-			Series:   strings.ReplaceAll(s.Series, ":", ""),
-			Title:    s.Title,
-			DateTime: parsedDateTime,
-		}
-		fmt.Printf("Showtime: %v\n", showtime)
-		av, err := dynamodbattribute.MarshalMap(showtime)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error marshalling new showtime item %v: %v", av, err)
-			continue
-		}
-		input := &dynamodb.PutItemInput{
-			Item:      av,
-			TableName: aws.String(dynamoDbTableName),
-		}
-		_, err = svc.PutItem(input)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error calling PutItem %v: %v", input, err)
-			continue
-		}
+		go func(s scrapedShowtime) {
+			defer wg.Done()
+			if s.Title == "" {
+				fmt.Fprintf(os.Stderr, "no title found for scraped entry %v", s)
+				return
+			}
+			if s.Date == "" || s.Time == "" {
+				fmt.Fprintf(os.Stderr, "no date and/or time for scraped entry %v", s)
+				return
+			}
+			parsedDateTime, err := parseDateTime(s.Date, s.Time)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "unable to parse datetime for %v on %v at %v: %v", s.Title, s.Date, s.Time, err)
+				return
+			}
+			st := showtime{
+				Series:   strings.ReplaceAll(s.Series, ":", ""),
+				Title:    s.Title,
+				DateTime: parsedDateTime,
+			}
+			fmt.Printf("Showtime: %v\n", st)
+			av, err := dynamodbattribute.MarshalMap(st)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error marshalling new showtime item %v: %v", av, err)
+				return
+			}
+			input := &dynamodb.PutItemInput{
+				Item:      av,
+				TableName: aws.String(dynamoDbTableName),
+			}
+			_, err = svc.PutItem(input)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error calling PutItem %v: %v", input, err)
+				return
+			}
+			return
+		}(s)
 	}
+	wg.Wait()
 	return nil
 }
 
