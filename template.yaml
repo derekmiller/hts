@@ -9,6 +9,24 @@ Globals:
   Function:
     Timeout: 5
 
+Parameters:
+  DBUsername:
+    NoEcho: 'true'
+    Description: Username for MySQL database access
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBPassword:
+    NoEcho: 'true'
+    Description: Password MySQL database access
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: must contain only alphanumeric characters.
+
 Resources:
   Hts:
     Type: AWS::Serverless::Function
@@ -26,37 +44,18 @@ Resources:
       Environment:
         Variables:
           ENVIRONMENT: production
-      Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - 'dynamodb:DeleteItem'
-                - 'dynamodb:GetItem'
-                - 'dynamodb:PutItem'
-                - 'dynamodb:UpdateItem'
-              Resource:
-                'Fn::Join':
-                  - ''
-                  - - 'arn:aws:dynamodb:'
-                    - Ref: 'AWS::Region'
-                    - ':'
-                    - Ref: 'AWS::AccountId'
-                    - ':table/HollywoodTheatreShowtimes'
-  HollywoodTheatreShowtimesTable:
-    Type: AWS::DynamoDB::Table
-    Properties: 
-      TableName: HollywoodTheatreShowtimes
-      AttributeDefinitions: 
-        - AttributeName: Title
-          AttributeType: S
-        - AttributeName: DateTime
-          AttributeType: S
-      KeySchema: 
-        - AttributeName: Title
-          KeyType: HASH
-        - AttributeName: DateTime
-          KeyType: RANGE
-      ProvisionedThroughput: 
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 10
+          DB_USERNAME: !Ref DBUsername
+          DB_PASSWORD: !Ref DBPassword
+  HtsRDSCluster:
+    Type: 'AWS::RDS::DBCluster'
+    Properties:
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBClusterIdentifier: hts-aurora-cluster
+      Engine: aurora
+      EngineMode: serverless
+      ScalingConfiguration:
+        AutoPause: true
+        MinCapacity: 4
+        MaxCapacity: 32
+        SecondsUntilAutoPause: 1000
