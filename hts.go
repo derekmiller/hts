@@ -1,24 +1,17 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/gocolly/colly"
 )
 
 const (
-	localDynamoDbURL    = "http://docker.for.mac.localhost:8000/"
-	dynamoDbTableName   = "HollywoodTheatreShowtimes"
 	hollywoodTheatreURL = "https://hollywoodtheatre.org/m/calendar/"
 	dateTimeFormat      = "2006-01-023:04 PM"
 	timezone            = "America/Los_Angeles"
@@ -37,8 +30,7 @@ type showtime struct {
 	DateTime time.Time
 }
 
-func handler(ctx context.Context) error {
-	svc := getDynamoDBService()
+func scrape() error {
 	scrapedShowtimes := scrapeShowtimes()
 	var wg sync.WaitGroup
 	wg.Add(len(scrapedShowtimes))
@@ -64,37 +56,11 @@ func handler(ctx context.Context) error {
 				DateTime: parsedDateTime,
 			}
 			fmt.Printf("Showtime: %v\n", st)
-			av, err := dynamodbattribute.MarshalMap(st)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error marshalling new showtime item %v: %v", av, err)
-				return
-			}
-			input := &dynamodb.PutItemInput{
-				Item:      av,
-				TableName: aws.String(dynamoDbTableName),
-			}
-			_, err = svc.PutItem(input)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error calling PutItem %v: %v", input, err)
-				return
-			}
 			return
 		}(s)
 	}
 	wg.Wait()
 	return nil
-}
-
-func getDynamoDBService() *dynamodb.DynamoDB {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{SharedConfigState: session.SharedConfigEnable}))
-	if os.Getenv("ENVIRONMENT") == "development" {
-		return dynamodb.New(
-			sess,
-			&aws.Config{
-				Endpoint: aws.String(localDynamoDbURL),
-			})
-	}
-	return dynamodb.New(sess)
 }
 
 func scrapeShowtimes() []scrapedShowtime {
@@ -137,5 +103,8 @@ func parseDateTime(date, t string) (time.Time, error) {
 }
 
 func main() {
-	lambda.Start(handler)
+	err := scrape()
+	if err != nil {
+		log.Panicf("error: %v", err)
+	}
 }
