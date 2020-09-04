@@ -30,6 +30,13 @@ type showtime struct {
 	DateTime time.Time
 }
 
+func main() {
+	err := scrape()
+	if err != nil {
+		log.Panicf("error: %v", err)
+	}
+}
+
 func scrape() error {
 	scrapedShowtimes := scrapeShowtimes()
 	var wg sync.WaitGroup
@@ -100,11 +107,4 @@ func parseDateTime(date, t string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return parsedDateTime, nil
-}
-
-func main() {
-	err := scrape()
-	if err != nil {
-		log.Panicf("error: %v", err)
-	}
 }
