@@ -12,22 +12,24 @@ import (
 )
 
 const (
-	hollywoodTheatreURL = "https://hollywoodtheatre.org/m/calendar/"
+	hollywoodTheatreURL = "https://hollywoodtheatre.org"
 	dateTimeFormat      = "2006-01-023:04 PM"
 	timezone            = "America/Los_Angeles"
 )
 
 type scrapedShowtime struct {
-	Series string
-	Title  string
-	Date   string
-	Time   string
+	Series  string
+	Title   string
+	Date    string
+	Time    string
+	URLPath string
 }
 
 type showtime struct {
 	Series   string
 	Title    string
 	DateTime time.Time
+	URL      string
 }
 
 func main() {
@@ -57,10 +59,12 @@ func scrape() error {
 				fmt.Fprintf(os.Stderr, "unable to parse datetime for %v on %v at %v: %v", s.Title, s.Date, s.Time, err)
 				return
 			}
+			url := hollywoodTheatreURL + s.URLPath
 			st := showtime{
 				Series:   strings.ReplaceAll(s.Series, ":", ""),
 				Title:    s.Title,
 				DateTime: parsedDateTime,
+				URL:      url,
 			}
 			fmt.Printf("Showtime: %v\n", st)
 			return
@@ -81,11 +85,13 @@ func scrapeShowtimes() []scrapedShowtime {
 			title := e.ChildText(".calendar__events__day__event__title")
 			e.ForEach(".showtime-square", func(_ int, e *colly.HTMLElement) {
 				time := e.ChildText(":first-child")
+				urlPath := e.ChildAttr(":first-child", "href")
 				scrapedShowtime := scrapedShowtime{
-					Series: series,
-					Title:  title,
-					Date:   date,
-					Time:   time,
+					Series:  series,
+					Title:   title,
+					Date:    date,
+					Time:    time,
+					URLPath: urlPath,
 				}
 				scrapedShowtimes = append(scrapedShowtimes, scrapedShowtime)
 			})
