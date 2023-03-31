@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/gocolly/colly"
 )
 
@@ -32,7 +33,7 @@ type showtime struct {
 	URL      string
 }
 
-func main() {
+func handler() {
 	err := scrape()
 	if err != nil {
 		log.Panicf("error: %v", err)
@@ -113,4 +114,8 @@ func parseDateTime(date, t string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return parsedDateTime, nil
+}
+
+func main() {
+	lambda.Start(handler)
 }
