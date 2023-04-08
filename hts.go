@@ -2,14 +2,12 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/gocolly/colly"
 )
 
 const (
@@ -34,13 +32,6 @@ type showtime struct {
 }
 
 func handler() {
-	err := scrape()
-	if err != nil {
-		log.Panicf("error: %v", err)
-	}
-}
-
-func scrape() error {
 	scrapedShowtimes := scrapeShowtimes()
 	var wg sync.WaitGroup
 	wg.Add(len(scrapedShowtimes))
@@ -72,48 +63,6 @@ func scrape() error {
 		}(s)
 	}
 	wg.Wait()
-	return nil
-}
-
-func scrapeShowtimes() []scrapedShowtime {
-	var scrapedShowtimes []scrapedShowtime
-	c := colly.NewCollector()
-
-	c.OnHTML(".calendar__events__day", func(e *colly.HTMLElement) {
-		date := e.Attr("data-calendar-date")
-		e.ForEach(".calendar__events__day__event", func(_ int, e *colly.HTMLElement) {
-			series := e.ChildText(".calendar__events__day__event__series")
-			title := e.ChildText(".calendar__events__day__event__title")
-			e.ForEach(".showtime-square", func(_ int, e *colly.HTMLElement) {
-				time := e.ChildText(":first-child")
-				urlPath := e.ChildAttr(":first-child", "href")
-				scrapedShowtime := scrapedShowtime{
-					Series:  series,
-					Title:   title,
-					Date:    date,
-					Time:    time,
-					URLPath: urlPath,
-				}
-				scrapedShowtimes = append(scrapedShowtimes, scrapedShowtime)
-			})
-		})
-	})
-
-	c.Visit(hollywoodTheatreURL)
-	return scrapedShowtimes
-}
-
-func parseDateTime(date, t string) (time.Time, error) {
-	dateTime := date + t
-	location, err := time.LoadLocation(timezone)
-	if err != nil {
-		return time.Time{}, err
-	}
-	parsedDateTime, err := time.ParseInLocation(dateTimeFormat, dateTime, location)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return parsedDateTime, nil
 }
 
 func main() {
